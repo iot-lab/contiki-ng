@@ -18,25 +18,8 @@
 # Copyright (C) 2011,2012 HiKoB.
 #
 
-ifneq ($(wildcard $(CONTIKI)/../openlab/),)
-	# Use directly openlab if available (from iot-lab repository)
-	OPENLAB_GIT = $(CONTIKI)/../openlab
-	OPENLAB_GIT_REL = ../../../openlab
-
-else
-	ifneq ($(wildcard $(OPENLAB)/git),)
-		# use symbolic link 'git -> openlab directory'
-		OPENLAB_GIT = $(OPENLAB)/git
-		OPENLAB_GIT_REL = $(OPENLAB_REL)/git
-	else
-
-$(warning $(OPENLAB)/git should be a symbolic link to the 'openlab' repository)
-$(warning     cd contiki/platform/openlab)
-$(warning  	  ln -s path_to_openlab_repository git)
-$(error Could not find openlab repository)
-	endif
-endif
-
+OPENLAB_GIT ?= $(CONTIKI)/../openlab
+OPENLAB_GIT_REL ?= ../../../../openlab
 
 GCCPREFIX = arm-none-eabi
 CC        = ${GCCPREFIX}-gcc
@@ -59,11 +42,6 @@ CFLAGS   += -gdwarf-2 -fno-builtin -fsingle-precision-constant
 CFLAGS   += -mcpu=cortex-m3 -mthumb -mthumb-interwork -mfix-cortex-m3-ldrd -msoft-float
 CFLAGS   += -mno-unaligned-access
 
-ifndef ELF_LOADER
-CFLAGS   += -ffunction-sections -fdata-sections -Wl,--gc-sections
-endif
-
-
 #
 # Disable problematic warnings with contiki code
 #
@@ -84,8 +62,6 @@ CFLAGS   += -Wno-implicit-function-declaration
 CFLAGS   += -Wno-maybe-uninitialized
 CFLAGS   += -fno-strict-aliasing
 
-
-
 # escape characters conflicts with SLIP
 CFLAGS   += -DNO_DEBUG_COLOR
 
@@ -94,9 +70,6 @@ LDFLAGS  += -nostartfiles
 LDFLAGS  += -nodefaultlibs
 LDFLAGS  += -T${LINKERSCRIPT}
 LDFLAGS  += -mcpu=cortex-m3 -mthumb -mthumb-interwork
-ifndef ELF_LOADER
-LDFLAGS  += -ffunction-sections -fdata-sections -Wl,--gc-sections
-endif
 
 OOCD_PORT   = 123
 GDB_PORT    = 3${OOCD_PORT}
@@ -153,15 +126,15 @@ reset:
 
 
 OPENLAB_INCLUDE_PATH += \
-	-I$(OPENLAB)				\
+	-I$(IOTLAB_DIR)				\
 	-I$(OPENLAB_GIT)	                \
 	-I$(OPENLAB_GIT)/drivers/cortex-m3	\
 	-I$(OPENLAB_GIT)/drivers/stm32		\
 	-I$(OPENLAB_GIT)/drivers/stm32f1xx
 
 OPENLAB_TARGET_DIRS  += . 			\
-	$(OPENLAB_REL)				\
-	$(OPENLAB_REL)/dev				\
+	.				\
+	./dev				\
 	$(OPENLAB_GIT_REL)/drivers		\
 	$(OPENLAB_GIT_REL)/lib	 		\
 	$(OPENLAB_GIT_REL)/net	 		\
@@ -211,9 +184,3 @@ OPENLAB_CONTIKI_WRAPPERS +=			\
 	rtimer-arch.c			\
 	leds-arch.c			\
 	platform-sensors.c
-
-
-CONTIKI_SRC += 					\
-	leds.c 					\
-	sensors.c				\
-	slip.c

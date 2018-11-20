@@ -36,6 +36,10 @@ OOCD_ITF         = $(OPENLAB_GIT)/platform/scripts/iotlab-m3.cfg
 #
 include $(IOTLAB_DIR)/Makefile.include
 
+CONTIKI_TARGET_SOURCEFILES += 					\
+	leds.c 					\
+	sensors.c				\
+	slip.c
 
 ##
 ## Target specific sources
@@ -73,7 +77,17 @@ OPENLAB_CONTIKI_WRAPPERS += pressure-sensor.c
 
 # Contiki apps and drivers
 #TODO: fix (only m3)
-CONTIKI_SRC += xmem.c
-CONTIKI_SRC += cfs-coffee.c
+CONTIKI_TARGET_SOURCEFILES += xmem.c
+CONTIKI_TARGET_SOURCEFILES += cfs-coffee.c
+
+CONTIKI_TARGET_DIRS += $(OPENLAB_TARGET_DIRS)
+
+CONTIKI_TARGET_SOURCEFILES +=  			\
+	$(OPENLAB_SRC)		 		\
+	$(OPENLAB_CONTIKI_WRAPPERS)		\
+	$(CONTIKI_TARGET_SOURCEFILES) \
+	$(CONTIKI_TARGET_MAIN)
+
+CONTIKI_SOURCEFILES += $(CONTIKI_TARGET_SOURCEFILES)
 
 include $(IOTLAB_DIR)/Makefile.include_tail
