@@ -51,14 +51,6 @@
 /* CFS defines */
 #define XMEM_ERASE_UNIT_SIZE (64*1024L)
 
-/* Elf loader defines */
-#ifndef ELFLOADER_CONF_DATAMEMORY_SIZE
-#define ELFLOADER_CONF_DATAMEMORY_SIZE 0x800
-#endif
-#ifndef ELFLOADER_CONF_TEXTMEMORY_SIZE
-#define ELFLOADER_CONF_TEXTMEMORY_SIZE 0x800
-#endif
-
 /* Sensors / actuators */
 #define PLATFORM_HAS_LEDS    1
 #define PLATFORM_HAS_LIGHT   1
