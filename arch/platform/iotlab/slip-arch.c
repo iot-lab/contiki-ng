@@ -47,9 +47,10 @@ void slip_arch_writeb (unsigned char c)
   uart_transfer(SLIP_ARCH_CONF_UART, &c, 1);
 }
 
-void slip_arch_init (unsigned long ubr)
+void slip_arch_init (void)
 {
-  uart_enable(SLIP_ARCH_CONF_UART, ubr);
+  /* TODO: check if correct or if we need 115200 */
+  uart_enable(SLIP_ARCH_CONF_UART, SLIP_ARCH_CONF_BAUDRATE);
   uart_set_rx_handler(SLIP_ARCH_CONF_UART, rx_handler, NULL);
   // configure highest priority to avoid missing bytes
   uart_set_irq_priority(SLIP_ARCH_CONF_UART, 0);

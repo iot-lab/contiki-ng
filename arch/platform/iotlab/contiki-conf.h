@@ -37,6 +37,24 @@
 #include PROJECT_CONF_PATH
 #endif /* PROJECT_CONF_PATH */
 
+#include "board.h"
+
+// TODO: port to Contiki-NG LED HAL
+// #define LEDS_GREEN       1
+// #define LEDS_YELLOW      4
+// #define LEDS_RED         2
+// #define LEDS_BLUE        0
+// #define LEDS_CONF_ALL   (LEDS_GREEN | LEDS_YELLOW | LEDS_RED | LEDS_BLUE)
+
+#ifndef SLIP_ARCH_CONF_BAUDRATE
+#define SLIP_ARCH_CONF_BAUDRATE 500000
+#endif
+
+#if SLIP_ARCH_CONF_BAUDRATE != 500000
+#warning Only 500000 baudrate works on iotlab testbed.
+#warning This warning can be ignored if you are working on a standalone board.
+#endif
+
 /* ---------------------------------------- */
 /*
  *  Clock module and rtimer support
@@ -44,9 +62,9 @@
  */
 
 #define CLOCK_CONF_SECOND 100
-
 typedef unsigned int   clock_time_t;
-typedef unsigned short rtimer_clock_t;
+
+#define RTIMER_CONF_CLOCK_SIZE 2
 
 /* ---------------------------------------- */
 /*

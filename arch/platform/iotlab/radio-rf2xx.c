@@ -38,6 +38,7 @@
 
 #include "contiki.h"
 #include "contiki-net.h"
+#include "net/packetbuf.h"
 #include "sys/rtimer.h"
 #include "dev/leds.h"
 
@@ -643,7 +644,7 @@ PROCESS_THREAD(rf2xx_process, ev, data)
             if (len > 0)
             {
                 packetbuf_set_datalen(len);
-                NETSTACK_RDC.input();
+                NETSTACK_MAC.input();
             }
         }
     }

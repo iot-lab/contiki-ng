@@ -22,11 +22,12 @@
  *         Contiki add-ons for HiKoB OpenLab Fox
  *
  * \author
- *         Clement Burin Des Roziers <clement.burin-des-roziers.at.hikob.com> 
+ *         Clement Burin Des Roziers <clement.burin-des-roziers.at.hikob.com>
  *         Antoine Fraboulet <antoine.fraboulet.at.hikob.com>
- *         
+ *
  */
 
+#include "contiki.h"
 #include "platform.h"
 #include "nvic.h"
 #include "soft_timer_delay.h"
@@ -42,7 +43,7 @@
 static volatile clock_time_t clock_cnt     = 0;
 static volatile unsigned int clock_sec     = 0;
 static volatile clock_time_t clock_sec_cnt = 0;
- 
+
 /*-----------------------------------------------------------------------------------*/
 
 static void clock_alarm(handler_arg_t arg)
@@ -51,12 +52,12 @@ static void clock_alarm(handler_arg_t arg)
     clock_cnt ++;
     clock_sec_cnt ++;
 
-    if (etimer_pending() && etimer_next_expiration_time() <= clock_cnt) 
+    if (etimer_pending() && etimer_next_expiration_time() <= clock_cnt)
     {
 	etimer_request_poll();
     }
 
-    if (clock_sec_cnt == CLOCK_SECOND) 
+    if (clock_sec_cnt == CLOCK_SECOND)
     {
 	clock_sec ++;
 	clock_sec_cnt = 0;
@@ -65,8 +66,8 @@ static void clock_alarm(handler_arg_t arg)
 
 /*-----------------------------------------------------------------------------------*/
 
-void clock_init(void) 
-{ 
+void clock_init(void)
+{
     // Enable the SysTick, CLOCK_SECOND Hz
     log_debug("Starting systick timer at %dHz", CLOCK_SECOND);
     nvic_enable_systick(CLOCK_SECOND, clock_alarm, 0);
@@ -74,9 +75,9 @@ void clock_init(void)
 
 /*-----------------------------------------------------------------------------------*/
 
-clock_time_t clock_time(void) 
+clock_time_t clock_time(void)
 {
-    return clock_cnt; 
+    return clock_cnt;
 }
 
 /*-----------------------------------------------------------------------------------*/
@@ -107,7 +108,7 @@ void clock_delay_usec(uint16_t delay)
 /*
  * delay the CPU in clock ticks
  */
-void clock_wait(clock_time_t delay) 
+void clock_wait(clock_time_t delay)
 {
     soft_timer_delay_us( soft_timer_ticks_to_us(delay) );
 }
