@@ -504,8 +504,6 @@ get_channel()
 static radio_result_t
 get_value(radio_param_t param, radio_value_t *value)
 {
-  int v;
-
   if(!value) {
     return RADIO_RESULT_INVALID_VALUE;
   }
