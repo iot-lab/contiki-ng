@@ -45,8 +45,13 @@ CFLAGS   += -gdwarf-2 -fno-builtin -fsingle-precision-constant
 CFLAGS   += -mcpu=cortex-m3 -mthumb -mthumb-interwork -mfix-cortex-m3-ldrd -msoft-float
 CFLAGS   += -mno-unaligned-access
 
+
+# Silent warnings for the moment. Clean them on contiki later.
+CFLAGS   += -fno-strict-aliasing
+
 # escape characters conflicts with SLIP
 CFLAGS   += -DNO_DEBUG_COLOR
+
 
 LDFLAGS  += -nostartfiles
 LDFLAGS  += -nodefaultlibs
