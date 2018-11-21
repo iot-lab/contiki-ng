@@ -23,58 +23,19 @@ IOTLAB_DIR = $(CONTIKI)/arch/platform/iotlab
 BOARD ?= m3
 BOARDS = m3 a8-m3
 
+include $(IOTLAB_DIR)/$(BOARD)/Makefile.include
+
 DEBUG            = 1
 CFLAGS          += -DKEEP_UART=1
 LINKERSCRIPT     = $(OPENLAB_GIT)/platform/scripts/stm32f103rey6.ld
-
-OOCD_TARGET      = stm32f1x
-#TODO: fix
-OOCD_ITF         = $(OPENLAB_GIT)/platform/scripts/iotlab-m3.cfg
 
 #
 # Global 'openlab' platforms sources
 #
 include $(IOTLAB_DIR)/Makefile.include
 
-##
-## Target specific sources
-##
-
-## Openlab sources
-# Platform config
-#TODO: fix
-OPENLAB_SRC += iotlab-m3/iotlab-m3.c
-OPENLAB_SRC += iotlab-m3/iotlab-m3_drivers.c
-OPENLAB_SRC += iotlab-m3/iotlab-m3_lib.c
-OPENLAB_SRC += iotlab-m3/iotlab-m3_periph.c
-
-# Drivers
-OPENLAB_SRC += lsm303dlhc/lsm303dlhc.c
-#TODO: fix (only m3)
-OPENLAB_SRC += lps331ap/lps331ap.c
-OPENLAB_SRC += l3g4200d/l3g4200d.c
-#TODO: fix (only m3)
-OPENLAB_SRC += isl29020/isl29020.c
-#TODO: fix (only m3)
-OPENLAB_SRC += n25xxx/n25xxx.c
-
-## Contiki sources
-# Wrappers from Openlab to Contiki API
-OPENLAB_CONTIKI_WRAPPERS += acc-mag-sensor.c
-OPENLAB_CONTIKI_WRAPPERS += fake-button-sensor.c
-OPENLAB_CONTIKI_WRAPPERS += gyr-sensor.c
-#TODO: fix (only m3)
-OPENLAB_CONTIKI_WRAPPERS += light-sensor.c
-#TODO: fix (only m3)
-OPENLAB_CONTIKI_WRAPPERS += pressure-sensor.c
-
 # Contiki-NG modules
 MODULES += os/storage/cfs
-
-# Contiki apps and drivers
-#TODO: fix (only m3)
-CONTIKI_TARGET_SOURCEFILES += xmem.c
-CONTIKI_TARGET_SOURCEFILES += cfs-coffee.c
 
 CONTIKI_TARGET_DIRS += . $(BOARD)
 CONTIKI_TARGET_DIRS += $(OPENLAB_TARGET_DIRS)
