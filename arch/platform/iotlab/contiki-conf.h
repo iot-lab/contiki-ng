@@ -37,14 +37,22 @@
 #include PROJECT_CONF_PATH
 #endif /* PROJECT_CONF_PATH */
 
-#include "board.h"
+#include "iotlab-def.h"
 
-// TODO: port to Contiki-NG LED HAL
-// #define LEDS_GREEN       1
-// #define LEDS_YELLOW      4
-// #define LEDS_RED         2
-// #define LEDS_BLUE        0
-// #define LEDS_CONF_ALL   (LEDS_GREEN | LEDS_YELLOW | LEDS_RED | LEDS_BLUE)
+/* Serial line and SLIP */
+
+#ifndef UART_CONF_ENABLE
+#define UART_CONF_ENABLE            1 /**< Enable/Disable UART I/O */
+#endif
+
+#ifndef SLIP_ARCH_CONF_ENABLED
+#define SLIP_ARCH_CONF_ENABLED      0 /**< Enable/Disable SLIP.
+                                typically done by example that require it */
+#endif
+
+#ifndef SLIP_ARCH_CONF_UART
+#define SLIP_ARCH_CONF_UART uart_print
+#endif
 
 #ifndef SLIP_ARCH_CONF_BAUDRATE
 #define SLIP_ARCH_CONF_BAUDRATE 500000
@@ -54,70 +62,5 @@
 #warning Only 500000 baudrate works on iotlab testbed.
 #warning This warning can be ignored if you are working on a standalone board.
 #endif
-
-/* ---------------------------------------- */
-/*
- *  Clock module and rtimer support
- *
- */
-
-#define CLOCK_CONF_SECOND 100
-typedef uint32_t  clock_time_t;
-
-#define RTIMER_CONF_CLOCK_SIZE 2
-
-/* ---------------------------------------- */
-/*
- * Cortex M3 / ARM
- *
- */
-
-typedef uint8_t  u8_t;
-typedef uint16_t u16_t;
-typedef uint32_t u32_t;
-typedef int8_t   s8_t;
-typedef int16_t  s16_t;
-typedef int32_t  s32_t;
-
-#define CC_BYTE_ALIGNED __attribute__ ((packed, aligned(1)))
-/* Prefix for relocation sections in ELF files */
-#define REL_SECT_PREFIX ".rel"
-
-/* Delay between GO signal and SFD
- * TODO: the current value is only a guess, needs actual measurement */
-#define RADIO_DELAY_BEFORE_TX ((unsigned)US_TO_RTIMERTICKS(182))
-/* Delay between GO signal and start listening
- * TODO: the current value is only a guess, needs actual measurement */
-#define RADIO_DELAY_BEFORE_RX ((unsigned)US_TO_RTIMERTICKS(150))
-/* Delay between the SFD finishes arriving and it is detected in software */
-#define RADIO_DELAY_BEFORE_DETECT ((unsigned)US_TO_RTIMERTICKS(0))
-
-/* ---------------------------------------- */
-
-#define PLATFORM_CONF_SUPPORTS_STACK_CHECK  0
-
-/*
- * Networking configuration inpired by cooja/contiki-conf.h
- */
-
-#ifndef UART_CONF_ENABLE
-#define UART_CONF_ENABLE            1 /**< Enable/Disable UART I/O */
-#endif
-
-#ifndef SLIP_ARCH_CONF_ENABLED
-#define SLIP_ARCH_CONF_ENABLED 0
-#endif
-#define RF2XX_DEVICE rf231
-#define SLIP_ARCH_CONF_UART uart_print
-
-/*
- * Global Configuration networking
- */
-typedef unsigned int uip_stats_t;
-#define LINKADDR_CONF_SIZE          8
-
-#define NETSTACK_CONF_RADIO         rf2xx_driver
-/* Max payload of rf2xx is 125 bytes (128 -1 for length -2 for CRC) */
-#define PACKETBUF_CONF_SIZE         125
 
 #endif /* CONTIKI_CONF_H_ */
