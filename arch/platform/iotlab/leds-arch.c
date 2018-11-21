@@ -37,6 +37,12 @@
 // #define LED_2_PORT   gpioC
 // #define LED_2_PIN    GPIO_PIN_10
 //
+void
+platform_leds_setup(void)
+{
+ /* Needed because called by OpenLab. We still need to Implementation
+  * the Contiki-NG HAL */
+}
 // void platform_leds_setup(void)
 // {
 //     gpio_enable(LED_0_PORT);

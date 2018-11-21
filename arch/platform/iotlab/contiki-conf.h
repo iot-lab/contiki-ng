@@ -94,12 +94,18 @@ typedef int32_t  s32_t;
 
 /* ---------------------------------------- */
 
+#define PLATFORM_CONF_SUPPORTS_STACK_CHECK  0
+
 /*
  * Networking configuration inpired by cooja/contiki-conf.h
  */
 
-#ifndef SLIP_ARCH_CONF_ENABLE
-#define SLIP_ARCH_CONF_ENABLE 0
+#ifndef UART_CONF_ENABLE
+#define UART_CONF_ENABLE            1 /**< Enable/Disable UART I/O */
+#endif
+
+#ifndef SLIP_ARCH_CONF_ENABLED
+#define SLIP_ARCH_CONF_ENABLED 0
 #endif
 #define RF2XX_DEVICE rf231
 #define SLIP_ARCH_CONF_UART uart_print

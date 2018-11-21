@@ -31,178 +31,104 @@
 
 #include "platform.h"
 #include "drivers/unique_id.h"
-#define NO_DEBUG_HEADER
-#define LOG_LEVEL LOG_LEVEL_INFO
-#include "debug.h"
-
 
 #include "contiki.h"
 #include "contiki-net.h"
-
 
 #include "lib/sensors.h"
 #include "dev/serial-line.h"
 #include "dev/uart1.h"
 #include "dev/watchdog.h"
+#include "drivers/unique_id.h"
 
-
-#if SLIP_ARCH_CONF_ENABLE
+#if SLIP_ARCH_CONF_ENABLED
 #include "dev/slip.h"
 #endif
 
-
-#define PROCESS_CONF_NO_PROCESS_NAMES 0
-
-/*---------------------------------------------------------------------------*/
-/*
- * Platform definition
- *
- */
-extern void set_rime_addr();  // defined by specific platform
-/*---------------------------------------------------------------------------*/
-void print_rime_addr()
-{
-#if LINKADDR_SIZE == 8
-    log_debug("Link Addr: %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",
-            linkaddr_node_addr.u8[0],
-            linkaddr_node_addr.u8[1],
-            linkaddr_node_addr.u8[2],
-            linkaddr_node_addr.u8[3],
-            linkaddr_node_addr.u8[4],
-            linkaddr_node_addr.u8[5],
-            linkaddr_node_addr.u8[6],
-            linkaddr_node_addr.u8[7]);
-#else
-    log_debug("Link Addr: %02x:%02x",
-            linkaddr_node_addr.u8[0],
-            linkaddr_node_addr.u8[1]);
-#endif
-}
-
+/* Log configuration */
+#include "sys/log.h"
+#define LOG_MODULE "IoT-LAB"
+#define LOG_LEVEL LOG_LEVEL_MAIN
+// #define NO_DEBUG_HEADER
+// #include "debug.h"
 
 /*---------------------------------------------------------------------------*/
-void uip_log(char *msg)
-{
-    log_printf("%s\n", msg);
-}
-/*---------------------------------------------------------------------------*/
+#if UART_CONF_ENABLE
 static void
-print_processes(struct process * const processes[])
-{
-#if !PROCESS_CONF_NO_PROCESS_NAMES
-    printf(" Starting");
-    while(*processes != NULL)
-    {
-        printf(" '%s'", (*processes)->name);
-        processes++;
-    }
-#endif /* !PROCESS_CONF_NO_PROCESS_NAMES */
-    putchar('\n');
-}
-/*---------------------------------------------------------------------------*/
-static void char_rx(handler_arg_t arg, uint8_t c)
+char_rx(handler_arg_t arg, uint8_t c)
 {
     uart1_get_input_handler()(c);
 }
+#endif
 /*---------------------------------------------------------------------------*/
-int main()
+static void
+set_linkaddr(void)
 {
-    static uint32_t idle_count = 0;
+#if LINKADDR_SIZE == 2
+    uint16_t short_uid = platform_uid();
+    linkaddr_node_addr.u8[0] = 0xff & (short_uid >> 8);
+    linkaddr_node_addr.u8[1] = 0xff & (short_uid);
+#else
 
-    /*
-     * OpenLab Platform init
-     *
-     */
+#define IOTLAB_UID_ADDR 1
+#if !(IOTLAB_UID_ADDR)
+    /* Company 3 Bytes */
+    linkaddr_node_addr.u8[0] = 0x01;
+    linkaddr_node_addr.u8[1] = 0x23;
+    linkaddr_node_addr.u8[2] = 0x45;
 
-    platform_init();
+    /* Platform identifier */
+    linkaddr_node_addr.u8[3] = 0x01;
 
-    /*
-     * Contiki core
-     *
-     */
+    /* Generate 4 remaining bytes using uid of processor */
+    // use bytes 8-11 to ensure uniqueness (tested empirically)
+    int i;
+    for (i = 0; i < 4; i++)
+        linkaddr_node_addr.u8[i+4] = uid->uid8[i+8];
 
-    clock_init();
-    process_init();
-    rtimer_init();
-    process_start(&etimer_process, NULL);
-    ctimer_init();
+#else
+    memset(&linkaddr_node_addr, 0, sizeof(linkaddr_node_addr));
+    uint16_t short_uid = platform_uid();
+    linkaddr_node_addr.u8[0] = 0x02;
+    linkaddr_node_addr.u8[6] = 0xff & (short_uid >> 8);
+    linkaddr_node_addr.u8[7] = 0xff & (short_uid);
 
-    /*
-     * Sensors
-     *
-     */
-
-    process_start(&sensors_process, NULL);
-
-    /*
-     * Network
-     *
-     */
-
-    netstack_init();
-    set_rime_addr();
-    print_rime_addr();
-
-#if NETSTACK_CONF_WITH_IPV6
-    memcpy(&uip_lladdr.addr, &linkaddr_node_addr, sizeof(uip_lladdr.addr));
-    process_start(&tcpip_process, NULL);
-
-    #if VIZTOOL_CONF_ON
-    process_start(&viztool_process, NULL);
-    #endif
-
-    #if (!UIP_CONF_IPV6_RPL)
-    {
-        uip_ipaddr_t ipaddr;
-
-        uip_ip6addr(&ipaddr, 0x2001, 0x630, 0x301, 0x6453, 0, 0, 0, 0);
-        uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
-        uip_ds6_addr_add(&ipaddr, 0, ADDR_TENTATIVE);
-    }
-    #endif /* UIP_CONF_IPV6_RPL */
-#endif /* NETSTACK_CONF_WITH_IPV6 */
-
-    /*
-     * init serial line
-     */
-    serial_line_init();
-    uart_set_rx_handler(uart_print, char_rx, NULL);
-    // configure highest priority to avoid missing bytes
-    uart_set_irq_priority(uart_print, 0);
-
-    /*
-     * eventually init slip device
-     * wich may override serial line
-     */
-#if SLIP_ARCH_CONF_ENABLE
-#ifndef UIP_CONF_LLH_LEN
-#error "LLH_LEN is not defined"
-#elif UIP_CONF_LLH_LEN != 0
-#error "LLH_LEN must be 0 to use slip interface"
 #endif
-    slip_arch_init(SLIP_ARCH_CONF_BAUDRATE);
 #endif
+}
 
-    /*
-     * Start
-     *
-     */
-
-    print_processes(autostart_processes);
-    autostart_start(autostart_processes);
-    watchdog_start();
-
-    while(1)
-    {
-        int r;
-        do
-        {
-            watchdog_periodic();
-            r = process_run();
-        } while(r > 0);
-        idle_count++;
-    }
-
-    return 0;
+/*---------------------------------------------------------------------------*/
+void
+platform_init_stage_one(void)
+{
+  /* Initialize OpenLab */
+  platform_init();
 }
 /*---------------------------------------------------------------------------*/
+void
+platform_init_stage_two(void)
+{
+  /* Set linkaddr */
+  set_linkaddr();
+#if UART_CONF_ENABLE
+  /*
+   * init serial line
+   */
+  serial_line_init();
+  uart_set_rx_handler(uart_print, char_rx, NULL);
+  /* configure highest priority to avoid missing bytes */
+  uart_set_irq_priority(uart_print, 0);
+#endif
+}
+/*---------------------------------------------------------------------------*/
+void
+platform_init_stage_three(void)
+{
+  process_start(&sensors_process, NULL);
+}
+/*---------------------------------------------------------------------------*/
+void
+platform_idle(void)
+{
+  /* Not implemented yet */
+}
