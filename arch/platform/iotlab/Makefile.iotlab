@@ -24,9 +24,6 @@ IOTLAB_DIR = $(CONTIKI)/arch/platform/iotlab
 
 #### Compilation and linker flags and options ####
 
-OPENLAB_GIT ?= $(CONTIKI)/../openlab
-OPENLAB_GIT_REL ?= ../../../../openlab
-
 GCCPREFIX = arm-none-eabi
 CC        = ${GCCPREFIX}-gcc
 LD        = ${GCCPREFIX}-gcc
@@ -72,7 +69,7 @@ OOCD        = openocd
 
 DEBUG            = 1
 CFLAGS          += -DKEEP_UART=1
-LINKERSCRIPT     = $(OPENLAB_GIT)/platform/scripts/stm32f103rey6.ld
+LINKERSCRIPT     = $(IOTLAB_DIR)/openlab/platform/scripts/stm32f103rey6.ld
 
 #### Board-specific makefile ####
 
@@ -83,11 +80,11 @@ include $(IOTLAB_DIR)/$(BOARD)/Makefile.include
 CONTIKI_TARGET_DIRS += .               \
          dev                           \
          $(BOARD)                      \
-         $(OPENLAB_GIT_REL)/drivers    \
-         $(OPENLAB_GIT_REL)/lib        \
-         $(OPENLAB_GIT_REL)/net        \
-         $(OPENLAB_GIT_REL)/periph     \
-         $(OPENLAB_GIT_REL)/platform
+         openlab/drivers               \
+         openlab/lib                   \
+         openlab/net                   \
+         openlab/periph                \
+         openlab/platform
 
 OPENLAB_SRC +=                            \
             cortex-m3/boot.c              \
@@ -115,6 +112,14 @@ OPENLAB_SRC +=                            \
             softtimer/soft_timer_delay.c  \
             rf2xx/rf2xx.c
 
+OPENLAB_INCLUDE_PATH +=                       \
+  -I$(IOTLAB_DIR)/openlab                     \
+  -I$(IOTLAB_DIR)/openlab/drivers/cortex-m3   \
+  -I$(IOTLAB_DIR)/openlab/drivers/stm32       \
+  -I$(IOTLAB_DIR)/openlab/drivers/stm32f1xx
+
+PLATFORM_INCLUDE_PATH += -I$(IOTLAB_DIR) $(OPENLAB_INCLUDE_PATH)
+
 CONTIKI_TARGET_SOURCEFILES +=          \
          $(OPENLAB_SRC)                \
          platform.c                    \
@@ -132,14 +137,6 @@ CONTIKI_TARGET_SOURCEFILES +=          \
          platform-sensors.c
 
 CONTIKI_SOURCEFILES += $(CONTIKI_TARGET_SOURCEFILES)
-
-OPENLAB_INCLUDE_PATH +=                \
-  -I$(OPENLAB_GIT)                     \
-  -I$(OPENLAB_GIT)/drivers/cortex-m3   \
-  -I$(OPENLAB_GIT)/drivers/stm32       \
-  -I$(OPENLAB_GIT)/drivers/stm32f1xx
-
-PLATFORM_INCLUDE_PATH += -I$(IOTLAB_DIR) $(OPENLAB_INCLUDE_PATH)
 
 #### Rules ####
 
