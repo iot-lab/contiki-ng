@@ -34,12 +34,13 @@
 
 #include "board-def.h"
 
-// TODO: port to Contiki-NG LED HAL
-// #define LEDS_GREEN       1
-// #define LEDS_YELLOW      4
-// #define LEDS_RED         2
-// #define LEDS_BLUE        0
-// #define LEDS_CONF_ALL   (LEDS_GREEN | LEDS_YELLOW | LEDS_RED | LEDS_BLUE)
+#define LEDS_CONF_GREEN       1
+#define LEDS_CONF_RED         2
+#define LEDS_CONF_YELLOW      4
+#define LEDS_CONF_ALL   (LEDS_CONF_GREEN | LEDS_CONF_YELLOW | LEDS_CONF_RED )
+
+// enable LEDS legacy API
+#define LEDS_CONF_LEGACY_API 1
 
 /* ---------------------------------------- */
 /*
