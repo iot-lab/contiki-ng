@@ -69,6 +69,10 @@ typedef int32_t  s32_t;
 /* Prefix for relocation sections in ELF files */
 #define REL_SECT_PREFIX ".rel"
 
+/* 1 len byte, 2 bytes CRC */
+#define RADIO_PHY_OVERHEAD         3
+/* 250kbps data rate. One byte = 32us */
+#define RADIO_BYTE_AIR_TIME       32
 /* Delay between GO signal and SFD
  * TODO: the current value is only a guess, needs actual measurement */
 #define RADIO_DELAY_BEFORE_TX ((unsigned)US_TO_RTIMERTICKS(182))
