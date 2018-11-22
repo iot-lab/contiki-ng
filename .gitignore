@@ -50,6 +50,7 @@ COOJA.testlog
 !Makefile.sky
 !Makefile.cc26x0-cc13x0
 !Makefile.zoul
+!Makefile.iotlab
 
 # other nRF52 build artifacts
 *.jlink
