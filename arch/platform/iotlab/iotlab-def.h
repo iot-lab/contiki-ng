@@ -90,7 +90,7 @@ typedef int32_t  s32_t;
 /* Max payload of rf2xx is 125 bytes (128 -1 for length -2 for CRC) */
 #define PACKETBUF_CONF_SIZE         125
 /* The rf2xx drivers do not support H/W ack */
-#define CSMA_SEND_SOFT_ACK          1
+#define CSMA_CONF_SEND_SOFT_ACK       1
 /* uip stats */
 typedef unsigned int uip_stats_t;
 
