@@ -124,6 +124,7 @@ platform_init_stage_two(void)
 void
 platform_init_stage_three(void)
 {
+  LOG_INFO("Target: %s, board: %s\n", CONTIKI_TARGET_STRING, CONTIKI_BOARD_STRING);
   process_start(&sensors_process, NULL);
 }
 /*---------------------------------------------------------------------------*/
