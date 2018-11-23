@@ -109,6 +109,7 @@ input_packet(void)
       ackdata[1] = 0;
       ackdata[2] = ((uint8_t *)packetbuf_hdrptr())[2];
       NETSTACK_RADIO.send(ackdata, CSMA_ACK_LEN);
+      LOG_DBG("soft ACK sent\n");
     }
 #endif /* CSMA_SEND_SOFT_ACK */
     if(!duplicate) {
