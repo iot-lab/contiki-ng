@@ -74,6 +74,8 @@ extern rf2xx_t RF2XX_DEVICE;
 #define RF2XX_WITH_TSCH 0
 #endif
 
+#define RF2XX_RSSI_BASE_VAL -91
+
 #define RF2XX_MAX_PAYLOAD 125
 #if RF2XX_SOFT_PREPARE
 static uint8_t tx_buf[RF2XX_MAX_PAYLOAD];
@@ -100,6 +102,9 @@ static volatile int rf2xx_current_channel;
 static uint8_t volatile poll_mode = 0;
 /* SFD timestamp of last incoming packet */
 static rtimer_clock_t sfd_start_time;
+/* Last packet metadata */
+static unsigned char last_packet_link_quality;
+static int last_packet_rssi;
 
 static int read(uint8_t *buf, uint8_t buf_len);
 static void listen(void);
@@ -535,6 +540,19 @@ get_txpower()
 }
 
 /*---------------------------------------------------------------------------*/
+/* Get the RSSI value (from PHY_RSSI), in dBm.
+ * Note: a return value of -94dBm (reg = 0), indicate actually a RSSI < -91dBm. */
+static int
+get_rssi()
+{
+  int reg;
+  platform_enter_critical();
+  reg = rf2xx_reg_read(RF2XX_DEVICE, RF2XX_REG__PHY_RSSI);
+  platform_exit_critical();
+  return RF2XX_RSSI_BASE_VAL + 3 * ((reg & RF2XX_PHY_RSSI_MASK__RSSI) - 1);
+}
+
+/*---------------------------------------------------------------------------*/
 /* Enable or disable poll mode */
 static void
 set_poll_mode(uint8_t enable)
@@ -589,6 +607,15 @@ get_value(radio_param_t param, radio_value_t *value)
       return RADIO_RESULT_OK;
   case RADIO_PARAM_TXPOWER:
     *value = get_txpower();
+    return RADIO_RESULT_OK;
+  case RADIO_PARAM_RSSI:
+    *value = get_rssi();
+    return RADIO_RESULT_OK;
+  case RADIO_PARAM_LAST_RSSI:
+    *value = last_packet_rssi;
+    return RADIO_RESULT_OK;
+  case RADIO_PARAM_LAST_LINK_QUALITY:
+    *value = last_packet_link_quality;
     return RADIO_RESULT_OK;
   case RADIO_CONST_CHANNEL_MIN:
     *value = 11;
@@ -996,7 +1023,7 @@ static int read(uint8_t *buf, uint8_t buf_len)
     log_info("radio-rf2xx: Received packet of length: %u", len);
 
     // Check valid length (not zero and enough space to store it)
-    if (len > buf_len)
+    if (len == 0 || len > buf_len)
     {
         log_warning("radio-rf2xx: Received packet is too big (%u)", len);
         // Error length, end transfer
@@ -1004,8 +1031,25 @@ static int read(uint8_t *buf, uint8_t buf_len)
         return 0;
     }
 
-    // Read payload
-    rf2xx_fifo_read_remaining(RF2XX_DEVICE, buf, len);
+    // Read the payload (size `len`), the FCS (2B) and the LQI (1B)
+    uint8_t whole_buf[len + 3];
+    rf2xx_fifo_read_remaining(RF2XX_DEVICE, whole_buf, len + 3);
+
+    // Get meta-info on the packet
+    // Read registers
+    platform_enter_critical();
+    uint8_t reg_phy_cc_cca = rf2xx_reg_read(RF2XX_DEVICE, RF2XX_REG__PHY_CC_CCA);
+    uint8_t reg_phy_ed_level = rf2xx_reg_read(RF2XX_DEVICE, RF2XX_REG__PHY_ED_LEVEL);
+    platform_exit_critical();
+    // Convert & store results
+    last_packet_rssi = RF2XX_RSSI_BASE_VAL + reg_phy_ed_level;
+    packetbuf_set_attr(PACKETBUF_ATTR_RSSI, last_packet_rssi);
+    last_packet_link_quality = whole_buf[len + 2];
+    packetbuf_set_attr(PACKETBUF_ATTR_LINK_QUALITY, last_packet_link_quality);
+    packetbuf_set_attr(PACKETBUF_ATTR_CHANNEL, reg_phy_cc_cca & RF2XX_PHY_CC_CCA_MASK__CHANNEL);
+
+    // Accept the packet in memory
+    memcpy(buf, whole_buf, len);
 
 #ifdef RF2XX_LEDS_ON
         leds_off(LEDS_GREEN);
