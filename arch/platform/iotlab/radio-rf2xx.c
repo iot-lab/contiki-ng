@@ -571,6 +571,9 @@ get_value(radio_param_t param, radio_value_t *value)
     return RADIO_RESULT_INVALID_VALUE;
   }
   switch(param) {
+  case RADIO_PARAM_POWER_MODE:
+    if (rf2xx_on) *value = RADIO_POWER_MODE_ON; else *value = RADIO_POWER_MODE_OFF;
+    return RADIO_RESULT_OK;
   case RADIO_PARAM_CHANNEL:
     *value = get_channel();
     return RADIO_RESULT_OK;
@@ -608,6 +611,16 @@ static radio_result_t
 set_value(radio_param_t param, radio_value_t value)
 {
   switch(param) {
+  case RADIO_PARAM_POWER_MODE:
+    if (value != RADIO_POWER_MODE_ON && value != RADIO_POWER_MODE_OFF) {
+      return RADIO_RESULT_INVALID_VALUE;
+    }
+    if (value == RADIO_POWER_MODE_ON) {
+      rf2xx_wr_on();
+    } else {
+      rf2xx_wr_off();
+    }
+    return RADIO_RESULT_OK;
   case RADIO_PARAM_CHANNEL:
     if(value < 11 || value > 26) {
       return RADIO_RESULT_INVALID_VALUE;
