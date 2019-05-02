@@ -74,6 +74,8 @@ extern rf2xx_t RF2XX_DEVICE;
 #define RF2XX_WITH_TSCH 0
 #endif
 
+#define RF2XX_RSSI_BASE_VAL -91
+
 #define RF2XX_MAX_PAYLOAD 125
 #if RF2XX_SOFT_PREPARE
 static uint8_t tx_buf[RF2XX_MAX_PAYLOAD];
@@ -98,8 +100,13 @@ static volatile int rf2xx_current_channel;
 
 /* Are we currently in poll mode? */
 static uint8_t volatile poll_mode = 0;
+/* TX modes */
+static char send_on_cca = 0;
 /* SFD timestamp of last incoming packet */
 static rtimer_clock_t sfd_start_time;
+/* Last packet metadata */
+static unsigned char last_packet_link_quality;
+static int last_packet_rssi;
 
 static int read(uint8_t *buf, uint8_t buf_len);
 static void listen(void);
@@ -302,6 +309,16 @@ static int
 rf2xx_wr_send(const void *payload, unsigned short payload_len)
 {
     log_debug("radio-rf2xx: rf2xx_wr_send %d", payload_len);
+
+    if(send_on_cca) {
+        if(!rf2xx_wr_channel_clear()) {
+            log_debug("radio-rf2xx: channel is not clear");
+            return RADIO_TX_COLLISION;
+        } else {
+            log_debug("radio-rf2xx: channel is clear");
+        }
+    }
+
     if (rf2xx_wr_prepare(payload, payload_len))
     {
         return RADIO_TX_ERR;
@@ -474,6 +491,101 @@ rf2xx_wr_off(void)
 }
 
 /*---------------------------------------------------------------------------*/
+/* Get & set the TX power (PHY_TX_PWR).  Input & output of these functions
+ * are in dBm */
+static void
+set_txpower(int power)
+{
+  uint8_t reg, power_reg_value;
+
+  if (power <= -17)
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__m17dBm;
+  else if (power <= -12)
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__m12dBm;
+  else if (power <= -9)
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__m9dBm;
+  else if (power <= -7)
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__m7dBm;
+  else if (power <= -5)
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__m5dBm;
+  else if (power <= -4)
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__m4dBm;
+  else if (power <= -3)
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__m3dBm;
+  else if (power <= -2)
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__m2dBm;
+  else if (power <= -1)
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__m1dBm;
+  else if (power <= 0)
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__0dBm;
+  else if (power <= 1)
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__1_3dBm;
+  else if (power <= 2)
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__2_3dBm;
+  else
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__3dBm;
+
+  platform_enter_critical();
+  reg = rf2xx_reg_read(RF2XX_DEVICE, RF2XX_REG__PHY_TX_PWR);
+  platform_exit_critical();
+
+  reg = (reg & (RF2XX_PHY_TX_PWR_MASK__PA_BUF_LT | RF2XX_PHY_TX_PWR_MASK__PA_LT))
+      | (power_reg_value & RF2XX_PHY_TX_PWR_MASK__TX_PWR);
+
+  platform_enter_critical();
+  rf2xx_reg_write(RF2XX_DEVICE, RF2XX_REG__PHY_TX_PWR, reg);
+  platform_exit_critical();
+}
+
+static int
+get_txpower()
+{
+  // Conversion values, taken from the datasheet.  Some of them are decimal,
+  // truncated there because of the integer return type.
+  const static int8_t dbm_values[] = {3, 3, 2, 2, 1, 1, 0, -1, -2, -3, -4, -5, -7, -9, -12, -17};
+
+  platform_enter_critical();
+  uint8_t reg = rf2xx_reg_read(RF2XX_DEVICE, RF2XX_REG__PHY_TX_PWR);
+  platform_exit_critical();
+
+  return dbm_values[reg & RF2XX_PHY_TX_PWR_MASK__TX_PWR];
+}
+
+/*---------------------------------------------------------------------------*/
+/* Get & set the CCA threshold.  Input & output of this function are in dBm */
+static void
+set_cca_threshold(int power)
+{
+#define RF2XX_CCA_THRES_MASK__CCA_ED_THRES 0x0F
+  uint8_t reg = (((power - RF2XX_RSSI_BASE_VAL) / 2) & RF2XX_CCA_THRES_MASK__CCA_ED_THRES);
+  platform_enter_critical();
+  rf2xx_reg_write(RF2XX_DEVICE, RF2XX_REG__CCA_THRES, reg);
+  platform_exit_critical();
+}
+
+static int
+get_cca_threshold()
+{
+  platform_enter_critical();
+  uint8_t reg = rf2xx_reg_read(RF2XX_DEVICE, RF2XX_REG__CCA_THRES);
+  platform_exit_critical();
+  return RF2XX_RSSI_BASE_VAL + 2 * (reg & RF2XX_CCA_THRES_MASK__CCA_ED_THRES);
+}
+
+/*---------------------------------------------------------------------------*/
+/* Get the RSSI value (from PHY_RSSI), in dBm.
+ * Note: a return value of -94dBm (reg = 0), indicate actually a RSSI < -91dBm. */
+static int
+get_rssi()
+{
+  int reg;
+  platform_enter_critical();
+  reg = rf2xx_reg_read(RF2XX_DEVICE, RF2XX_REG__PHY_RSSI);
+  platform_exit_critical();
+  return RF2XX_RSSI_BASE_VAL + 3 * ((reg & RF2XX_PHY_RSSI_MASK__RSSI) - 1);
+}
+
+/*---------------------------------------------------------------------------*/
 /* Enable or disable poll mode */
 static void
 set_poll_mode(uint8_t enable)
@@ -481,6 +593,8 @@ set_poll_mode(uint8_t enable)
   poll_mode = enable;
 }
 
+/*---------------------------------------------------------------------------*/
+/* Channel configuration */
 static void
 set_channel(uint8_t channel)
 {
@@ -508,6 +622,12 @@ get_value(radio_param_t param, radio_value_t *value)
     return RADIO_RESULT_INVALID_VALUE;
   }
   switch(param) {
+  case RADIO_PARAM_POWER_MODE:
+    if (rf2xx_on) *value = RADIO_POWER_MODE_ON; else *value = RADIO_POWER_MODE_OFF;
+    return RADIO_RESULT_OK;
+  case RADIO_PARAM_CHANNEL:
+    *value = get_channel();
+    return RADIO_RESULT_OK;
   case RADIO_PARAM_RX_MODE:
     *value = 0;
     /* No frame filtering, no autoack */
@@ -516,10 +636,37 @@ get_value(radio_param_t param, radio_value_t *value)
     }
     return RADIO_RESULT_OK;
   case RADIO_PARAM_TX_MODE:
-      *value = 0; /* Mode is always 0 (send-on-cca not supported yet) */
-      return RADIO_RESULT_OK;
-  case RADIO_PARAM_CHANNEL:
-    *value = get_channel();
+    *value = 0;
+    if (send_on_cca) {
+      *value |= RADIO_TX_MODE_SEND_ON_CCA;
+    }
+    return RADIO_RESULT_OK;
+  case RADIO_PARAM_TXPOWER:
+    *value = get_txpower();
+    return RADIO_RESULT_OK;
+  case RADIO_PARAM_CCA_THRESHOLD:
+    *value = get_cca_threshold();
+    return RADIO_RESULT_OK;
+  case RADIO_PARAM_RSSI:
+    *value = get_rssi();
+    return RADIO_RESULT_OK;
+  case RADIO_PARAM_LAST_RSSI:
+    *value = last_packet_rssi;
+    return RADIO_RESULT_OK;
+  case RADIO_PARAM_LAST_LINK_QUALITY:
+    *value = last_packet_link_quality;
+    return RADIO_RESULT_OK;
+  case RADIO_CONST_CHANNEL_MIN:
+    *value = 11;
+    return RADIO_RESULT_OK;
+  case RADIO_CONST_CHANNEL_MAX:
+    *value = 26;
+    return RADIO_RESULT_OK;
+  case RADIO_CONST_TXPOWER_MIN:
+    *value = -17;
+    return RADIO_RESULT_OK;
+  case RADIO_CONST_TXPOWER_MAX:
+    *value = 3;
     return RADIO_RESULT_OK;
   default:
     return RADIO_RESULT_NOT_SUPPORTED;
@@ -530,6 +677,22 @@ static radio_result_t
 set_value(radio_param_t param, radio_value_t value)
 {
   switch(param) {
+  case RADIO_PARAM_POWER_MODE:
+    if (value != RADIO_POWER_MODE_ON && value != RADIO_POWER_MODE_OFF) {
+      return RADIO_RESULT_INVALID_VALUE;
+    }
+    if (value == RADIO_POWER_MODE_ON) {
+      rf2xx_wr_on();
+    } else {
+      rf2xx_wr_off();
+    }
+    return RADIO_RESULT_OK;
+  case RADIO_PARAM_CHANNEL:
+    if(value < 11 || value > 26) {
+      return RADIO_RESULT_INVALID_VALUE;
+    }
+    set_channel(value);
+    return RADIO_RESULT_OK;
   case RADIO_PARAM_RX_MODE:
     if(value & ~(RADIO_RX_MODE_ADDRESS_FILTER |
         RADIO_RX_MODE_AUTOACK | RADIO_RX_MODE_POLL_MODE)) {
@@ -546,15 +709,16 @@ set_value(radio_param_t param, radio_value_t value)
     set_poll_mode((value & RADIO_RX_MODE_POLL_MODE) != 0);
     return RADIO_RESULT_OK;
   case RADIO_PARAM_TX_MODE:
-    if(value != 0) { /* We support only mode 0 (send-on-cca not supported yet) */
+    if(value & ~(RADIO_TX_MODE_SEND_ON_CCA)) {
       return RADIO_RESULT_INVALID_VALUE;
     }
+    send_on_cca = ((value & RADIO_TX_MODE_SEND_ON_CCA) != 0);
     return RADIO_RESULT_OK;
-  case RADIO_PARAM_CHANNEL:
-    if(value < 11 || value > 26) {
-      return RADIO_RESULT_INVALID_VALUE;
-    }
-    set_channel(value);
+  case RADIO_PARAM_TXPOWER:
+    set_txpower(value);
+    return RADIO_RESULT_OK;
+  case RADIO_PARAM_CCA_THRESHOLD:
+    set_cca_threshold(value);
     return RADIO_RESULT_OK;
   default:
     return RADIO_RESULT_NOT_SUPPORTED;
@@ -902,7 +1066,7 @@ static int read(uint8_t *buf, uint8_t buf_len)
     log_info("radio-rf2xx: Received packet of length: %u", len);
 
     // Check valid length (not zero and enough space to store it)
-    if (len > buf_len)
+    if (len == 0 || len > buf_len)
     {
         log_warning("radio-rf2xx: Received packet is too big (%u)", len);
         // Error length, end transfer
@@ -910,8 +1074,25 @@ static int read(uint8_t *buf, uint8_t buf_len)
         return 0;
     }
 
-    // Read payload
-    rf2xx_fifo_read_remaining(RF2XX_DEVICE, buf, len);
+    // Read the payload (size `len`), the FCS (2B) and the LQI (1B)
+    uint8_t whole_buf[len + 3];
+    rf2xx_fifo_read_remaining(RF2XX_DEVICE, whole_buf, len + 3);
+
+    // Get meta-info on the packet
+    // Read registers
+    platform_enter_critical();
+    uint8_t reg_phy_cc_cca = rf2xx_reg_read(RF2XX_DEVICE, RF2XX_REG__PHY_CC_CCA);
+    uint8_t reg_phy_ed_level = rf2xx_reg_read(RF2XX_DEVICE, RF2XX_REG__PHY_ED_LEVEL);
+    platform_exit_critical();
+    // Convert & store results
+    last_packet_rssi = RF2XX_RSSI_BASE_VAL + reg_phy_ed_level;
+    packetbuf_set_attr(PACKETBUF_ATTR_RSSI, last_packet_rssi);
+    last_packet_link_quality = whole_buf[len + 2];
+    packetbuf_set_attr(PACKETBUF_ATTR_LINK_QUALITY, last_packet_link_quality);
+    packetbuf_set_attr(PACKETBUF_ATTR_CHANNEL, reg_phy_cc_cca & RF2XX_PHY_CC_CCA_MASK__CHANNEL);
+
+    // Accept the packet in memory
+    memcpy(buf, whole_buf, len);
 
 #ifdef RF2XX_LEDS_ON
         leds_off(LEDS_GREEN);
