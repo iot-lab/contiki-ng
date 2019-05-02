@@ -100,6 +100,8 @@ static volatile int rf2xx_current_channel;
 
 /* Are we currently in poll mode? */
 static uint8_t volatile poll_mode = 0;
+/* TX modes */
+static char send_on_cca = 0;
 /* SFD timestamp of last incoming packet */
 static rtimer_clock_t sfd_start_time;
 /* Last packet metadata */
@@ -307,6 +309,16 @@ static int
 rf2xx_wr_send(const void *payload, unsigned short payload_len)
 {
     log_debug("radio-rf2xx: rf2xx_wr_send %d", payload_len);
+
+    if(send_on_cca) {
+        if(!rf2xx_wr_channel_clear()) {
+            log_debug("radio-rf2xx: channel is not clear");
+            return RADIO_TX_COLLISION;
+        } else {
+            log_debug("radio-rf2xx: channel is clear");
+        }
+    }
+
     if (rf2xx_wr_prepare(payload, payload_len))
     {
         return RADIO_TX_ERR;
@@ -540,6 +552,27 @@ get_txpower()
 }
 
 /*---------------------------------------------------------------------------*/
+/* Get & set the CCA threshold.  Input & output of this function are in dBm */
+static void
+set_cca_threshold(int power)
+{
+#define RF2XX_CCA_THRES_MASK__CCA_ED_THRES 0x0F
+  uint8_t reg = (((power - RF2XX_RSSI_BASE_VAL) / 2) & RF2XX_CCA_THRES_MASK__CCA_ED_THRES);
+  platform_enter_critical();
+  rf2xx_reg_write(RF2XX_DEVICE, RF2XX_REG__CCA_THRES, reg);
+  platform_exit_critical();
+}
+
+static int
+get_cca_threshold()
+{
+  platform_enter_critical();
+  uint8_t reg = rf2xx_reg_read(RF2XX_DEVICE, RF2XX_REG__CCA_THRES);
+  platform_exit_critical();
+  return RF2XX_RSSI_BASE_VAL + 2 * (reg & RF2XX_CCA_THRES_MASK__CCA_ED_THRES);
+}
+
+/*---------------------------------------------------------------------------*/
 /* Get the RSSI value (from PHY_RSSI), in dBm.
  * Note: a return value of -94dBm (reg = 0), indicate actually a RSSI < -91dBm. */
 static int
@@ -603,10 +636,16 @@ get_value(radio_param_t param, radio_value_t *value)
     }
     return RADIO_RESULT_OK;
   case RADIO_PARAM_TX_MODE:
-      *value = 0; /* Mode is always 0 (send-on-cca not supported yet) */
-      return RADIO_RESULT_OK;
+    *value = 0;
+    if (send_on_cca) {
+      *value |= RADIO_TX_MODE_SEND_ON_CCA;
+    }
+    return RADIO_RESULT_OK;
   case RADIO_PARAM_TXPOWER:
     *value = get_txpower();
+    return RADIO_RESULT_OK;
+  case RADIO_PARAM_CCA_THRESHOLD:
+    *value = get_cca_threshold();
     return RADIO_RESULT_OK;
   case RADIO_PARAM_RSSI:
     *value = get_rssi();
@@ -670,12 +709,16 @@ set_value(radio_param_t param, radio_value_t value)
     set_poll_mode((value & RADIO_RX_MODE_POLL_MODE) != 0);
     return RADIO_RESULT_OK;
   case RADIO_PARAM_TX_MODE:
-    if(value != 0) { /* We support only mode 0 (send-on-cca not supported yet) */
+    if(value & ~(RADIO_TX_MODE_SEND_ON_CCA)) {
       return RADIO_RESULT_INVALID_VALUE;
     }
+    send_on_cca = ((value & RADIO_TX_MODE_SEND_ON_CCA) != 0);
     return RADIO_RESULT_OK;
   case RADIO_PARAM_TXPOWER:
     set_txpower(value);
+    return RADIO_RESULT_OK;
+  case RADIO_PARAM_CCA_THRESHOLD:
+    set_cca_threshold(value);
     return RADIO_RESULT_OK;
   default:
     return RADIO_RESULT_NOT_SUPPORTED;
