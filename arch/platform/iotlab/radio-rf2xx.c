@@ -474,6 +474,67 @@ rf2xx_wr_off(void)
 }
 
 /*---------------------------------------------------------------------------*/
+/* Get & set the TX power (PHY_TX_PWR).  Input & output of these functions
+ * are in dBm */
+static void
+set_txpower(int power)
+{
+  uint8_t reg, power_reg_value;
+
+  if (power <= -17)
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__m17dBm;
+  else if (power <= -12)
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__m12dBm;
+  else if (power <= -9)
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__m9dBm;
+  else if (power <= -7)
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__m7dBm;
+  else if (power <= -5)
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__m5dBm;
+  else if (power <= -4)
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__m4dBm;
+  else if (power <= -3)
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__m3dBm;
+  else if (power <= -2)
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__m2dBm;
+  else if (power <= -1)
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__m1dBm;
+  else if (power <= 0)
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__0dBm;
+  else if (power <= 1)
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__1_3dBm;
+  else if (power <= 2)
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__2_3dBm;
+  else
+    power_reg_value = RF2XX_PHY_TX_PWR_TX_PWR_VALUE__3dBm;
+
+  platform_enter_critical();
+  reg = rf2xx_reg_read(RF2XX_DEVICE, RF2XX_REG__PHY_TX_PWR);
+  platform_exit_critical();
+
+  reg = (reg & (RF2XX_PHY_TX_PWR_MASK__PA_BUF_LT | RF2XX_PHY_TX_PWR_MASK__PA_LT))
+      | (power_reg_value & RF2XX_PHY_TX_PWR_MASK__TX_PWR);
+
+  platform_enter_critical();
+  rf2xx_reg_write(RF2XX_DEVICE, RF2XX_REG__PHY_TX_PWR, reg);
+  platform_exit_critical();
+}
+
+static int
+get_txpower()
+{
+  // Conversion values, taken from the datasheet.  Some of them are decimal,
+  // truncated there because of the integer return type.
+  const static int8_t dbm_values[] = {3, 3, 2, 2, 1, 1, 0, -1, -2, -3, -4, -5, -7, -9, -12, -17};
+
+  platform_enter_critical();
+  uint8_t reg = rf2xx_reg_read(RF2XX_DEVICE, RF2XX_REG__PHY_TX_PWR);
+  platform_exit_critical();
+
+  return dbm_values[reg & RF2XX_PHY_TX_PWR_MASK__TX_PWR];
+}
+
+/*---------------------------------------------------------------------------*/
 /* Enable or disable poll mode */
 static void
 set_poll_mode(uint8_t enable)
@@ -523,11 +584,20 @@ get_value(radio_param_t param, radio_value_t *value)
   case RADIO_PARAM_TX_MODE:
       *value = 0; /* Mode is always 0 (send-on-cca not supported yet) */
       return RADIO_RESULT_OK;
+  case RADIO_PARAM_TXPOWER:
+    *value = get_txpower();
+    return RADIO_RESULT_OK;
   case RADIO_CONST_CHANNEL_MIN:
     *value = 11;
     return RADIO_RESULT_OK;
   case RADIO_CONST_CHANNEL_MAX:
     *value = 26;
+    return RADIO_RESULT_OK;
+  case RADIO_CONST_TXPOWER_MIN:
+    *value = -17;
+    return RADIO_RESULT_OK;
+  case RADIO_CONST_TXPOWER_MAX:
+    *value = 3;
     return RADIO_RESULT_OK;
   default:
     return RADIO_RESULT_NOT_SUPPORTED;
@@ -563,6 +633,9 @@ set_value(radio_param_t param, radio_value_t value)
     if(value != 0) { /* We support only mode 0 (send-on-cca not supported yet) */
       return RADIO_RESULT_INVALID_VALUE;
     }
+    return RADIO_RESULT_OK;
+  case RADIO_PARAM_TXPOWER:
+    set_txpower(value);
     return RADIO_RESULT_OK;
   default:
     return RADIO_RESULT_NOT_SUPPORTED;
