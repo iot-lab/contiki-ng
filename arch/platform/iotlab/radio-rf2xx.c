@@ -481,6 +481,8 @@ set_poll_mode(uint8_t enable)
   poll_mode = enable;
 }
 
+/*---------------------------------------------------------------------------*/
+/* Channel configuration */
 static void
 set_channel(uint8_t channel)
 {
@@ -508,6 +510,9 @@ get_value(radio_param_t param, radio_value_t *value)
     return RADIO_RESULT_INVALID_VALUE;
   }
   switch(param) {
+  case RADIO_PARAM_CHANNEL:
+    *value = get_channel();
+    return RADIO_RESULT_OK;
   case RADIO_PARAM_RX_MODE:
     *value = 0;
     /* No frame filtering, no autoack */
@@ -518,8 +523,11 @@ get_value(radio_param_t param, radio_value_t *value)
   case RADIO_PARAM_TX_MODE:
       *value = 0; /* Mode is always 0 (send-on-cca not supported yet) */
       return RADIO_RESULT_OK;
-  case RADIO_PARAM_CHANNEL:
-    *value = get_channel();
+  case RADIO_CONST_CHANNEL_MIN:
+    *value = 11;
+    return RADIO_RESULT_OK;
+  case RADIO_CONST_CHANNEL_MAX:
+    *value = 26;
     return RADIO_RESULT_OK;
   default:
     return RADIO_RESULT_NOT_SUPPORTED;
@@ -530,6 +538,12 @@ static radio_result_t
 set_value(radio_param_t param, radio_value_t value)
 {
   switch(param) {
+  case RADIO_PARAM_CHANNEL:
+    if(value < 11 || value > 26) {
+      return RADIO_RESULT_INVALID_VALUE;
+    }
+    set_channel(value);
+    return RADIO_RESULT_OK;
   case RADIO_PARAM_RX_MODE:
     if(value & ~(RADIO_RX_MODE_ADDRESS_FILTER |
         RADIO_RX_MODE_AUTOACK | RADIO_RX_MODE_POLL_MODE)) {
@@ -549,12 +563,6 @@ set_value(radio_param_t param, radio_value_t value)
     if(value != 0) { /* We support only mode 0 (send-on-cca not supported yet) */
       return RADIO_RESULT_INVALID_VALUE;
     }
-    return RADIO_RESULT_OK;
-  case RADIO_PARAM_CHANNEL:
-    if(value < 11 || value > 26) {
-      return RADIO_RESULT_INVALID_VALUE;
-    }
-    set_channel(value);
     return RADIO_RESULT_OK;
   default:
     return RADIO_RESULT_NOT_SUPPORTED;
